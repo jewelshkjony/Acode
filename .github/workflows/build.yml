@@ -1,0 +1,67 @@
+name: Build Signed Acode Paid APK
+
+on:
+  workflow_dispatch:   # manual trigger
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Yarn
+        run: npm install -g yarn
+
+      - name: Install dependencies (setup)
+        run: yarn setup
+
+      - name: Build Paid APK (release)
+        run: yarn build paid prod apk
+
+      - name: Generate default debug keystore
+        run: |
+          keytool -genkey -v -keystore debug.keystore -alias androiddebugkey \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass android -keypass android \
+            -dname "CN=Android Debug,O=Android,C=US"
+
+      - name: Sign APK with debug keystore
+        run: |
+          for apk in platforms/android/app/build/outputs/apk/release/*.apk; do
+            jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
+              -keystore debug.keystore \
+              -storepass android -keypass android \
+              "$apk" androiddebugkey
+          done
+
+      - name: Zipalign APK
+        run: |
+          for apk in platforms/android/app/build/outputs/apk/release/*.apk; do
+            zipalign -v 4 "$apk" "${apk%.apk}-signed.apk"
+          done
+
+      - name: Upload Signed APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Acode-Paid-Signed-Release-APK
+          path: platforms/android/app/build/outputs/apk/release/*-signed.apk
