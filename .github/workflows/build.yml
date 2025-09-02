@@ -54,10 +54,14 @@ jobs:
               "$apk" androiddebugkey
           done
 
+      - name: Install Android Build Tools
+        run: sdkmanager "build-tools;35.0.0"
+
       - name: Zipalign APK
         run: |
+          BUILD_TOOLS=$ANDROID_HOME/build-tools/34.0.0
           for apk in platforms/android/app/build/outputs/apk/release/*.apk; do
-            zipalign -v 4 "$apk" "${apk%.apk}-signed.apk"
+            $BUILD_TOOLS/zipalign -v 4 "$apk" "${apk%.apk}-signed.apk"
           done
 
       - name: Upload Signed APK
